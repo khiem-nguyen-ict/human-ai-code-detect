@@ -8,6 +8,8 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
+      - ./src:/app/src
+      - ./config:/app/config
     env_file: .env
     command: >
       sh -c "
@@ -30,6 +32,8 @@ services:
     volumes:
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
+      - ./src:/app/src
+      - ./config:/app/config
     env_file: .env
     command: python -m src.inference.api
     restart: unless-stopped
@@ -45,6 +49,8 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
+      - ./src:/app/src
+      - ./config:/app/config
     env_file: .env
     command: python -m src.monitoring.drift
     restart: "no"
@@ -58,6 +64,8 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
+      - ./src:/app/src
+      - ./config:/app/config
     env_file: .env
     command: python -m src.retrain.pipeline
     restart: "no"

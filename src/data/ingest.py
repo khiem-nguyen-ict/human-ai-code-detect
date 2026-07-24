@@ -10,6 +10,29 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 
+def ingest_dataset(
+    zip_path: str = "./dataset.zip",
+    output_dir: str = "./data/raw",
+) -> Path:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+
+    if not os.path.exists(zip_path):
+        logger.warning("Dataset archive not found at %s. Skipping extraction.", zip_path)
+        return output
+
+    logger.info("Extracting dataset from %s to %s", zip_path, output)
+    import zipfile
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(output)
+
+    for d in output.iterdir():
+        logger.info("Extracted: %s", d)
+
+    return output
+
+
 def list_source_files(data_dir: str, extension: str = ".c") -> dict[str, list[str]]:
     data_path = Path(data_dir)
     if not data_path.exists():
