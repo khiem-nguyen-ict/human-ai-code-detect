@@ -17,6 +17,7 @@ def run_stage(stage_name: str, command: list[str]) -> bool:
         command,
         capture_output=True,
         text=True,
+        check=False,
     )
 
     if result.stdout:

@@ -14,7 +14,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from torch.utils.data import DataLoader
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel
 
 load_dotenv()
 
@@ -101,12 +101,10 @@ def evaluate_model(
 def main() -> None:
     device = torch.device(os.getenv("DEVICE", "cpu"))
     checkpoint_path = os.getenv("PYTORCH_MODEL_PATH", "./models/checkpoints/graphcodebert_human_ai.pt")
-    tokenizer_path = os.getenv("TOKENIZER_PATH", "./tokenizer")
 
     if not Path(checkpoint_path).exists():
         raise FileNotFoundError(f"Model checkpoint not found: {checkpoint_path}")
 
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     base_model = AutoModel.from_pretrained("microsoft/graphcodebert-base")
 
     from src.models.train import ClassificationHead
@@ -114,6 +112,8 @@ def main() -> None:
     model = ClassificationHead(base_model, num_labels=2)
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.to(device)
+
+    from src.features.build_features import load_tokenized_data
 
     test_data = load_tokenized_data("human")
     test_dataset = CodeDataset(

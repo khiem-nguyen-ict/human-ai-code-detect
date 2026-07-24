@@ -239,9 +239,6 @@ def train() -> None:
         num_training_steps=total_steps,
     )
 
-    best_f1 = 0.0
-    best_epoch = 0
-
     for epoch in range(config["training"]["num_epochs"]):
         train_loss = train_epoch(
             model,

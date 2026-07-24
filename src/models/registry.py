@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+from typing import Optional
 
 import mlflow
 from dotenv import load_dotenv
@@ -16,7 +17,7 @@ def setup_mlflow() -> mlflow.MlflowClient:
     mlflow.set_tracking_uri(tracking_uri)
 
     experiment_name = os.getenv("MLFLOW_EXPERIMENT", "human-ai-code-detection")
-    experiment = mlflow.set_experiment(experiment_name)
+    mlflow.set_experiment(experiment_name)
 
     client = mlflow.MlflowClient()
     return client
@@ -28,7 +29,7 @@ def log_run(
     model_path: str,
     run_name: str = "training_run",
 ) -> str:
-    client = setup_mlflow()
+    setup_mlflow()
 
     with mlflow.start_run(run_name=run_name):
         mlflow.log_params(params)
@@ -44,8 +45,8 @@ def log_run(
 
 def register_model(
     model_path: str,
-    model_name: str = None,
-    run_id: str = None,
+    model_name: Optional[str] = None,
+    run_id: Optional[str] = None,
 ) -> str:
     model_name = model_name or os.getenv("MODEL_NAME", "graphcodebert-human-ai-classifier")
 
@@ -73,7 +74,9 @@ def register_model(
         raise
 
 
-def promote_to_production(model_name: str = None, version: str = None) -> None:
+def promote_to_production(
+    model_name: Optional[str] = None, version: Optional[str] = None
+) -> None:
     model_name = model_name or os.getenv("MODEL_NAME", "graphcodebert-human-ai-classifier")
 
     client = setup_mlflow()

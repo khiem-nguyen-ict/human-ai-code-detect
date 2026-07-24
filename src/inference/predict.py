@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import onnxruntime as ort
@@ -16,8 +17,8 @@ logger = logging.getLogger(__name__)
 class Predictor:
     def __init__(
         self,
-        onnx_path: str = None,
-        tokenizer_path: str = None,
+        onnx_path: Optional[str] = None,
+        tokenizer_path: Optional[str] = None,
     ):
         self.onnx_path = onnx_path or os.getenv(
             "ONNX_MODEL_PATH", "./models/onnx/graphcodebert_human_ai_fp16.onnx"

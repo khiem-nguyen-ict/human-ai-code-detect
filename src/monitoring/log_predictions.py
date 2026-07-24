@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -17,7 +18,7 @@ def log_prediction(
     prediction: str,
     human_prob: float,
     ai_prob: float,
-    log_path: str = None,
+    log_path: Optional[str] = None,
 ) -> None:
     log_path = log_path or os.getenv(
         "PREDICTION_LOG_PATH", "./data/processed/predictions_log.csv"
@@ -46,7 +47,7 @@ def log_prediction(
 
 
 def get_prediction_history(
-    log_path: str = None,
+    log_path: Optional[str] = None,
     limit: int = 100,
 ) -> list[dict]:
     log_path = log_path or os.getenv(
