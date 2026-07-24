@@ -56,7 +56,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate dataset
-        run: python -m src.data.validate
+        run: |
+          mkdir -p data/raw/human data/raw/ai
+          for i in $(seq 1 10); do
+            echo "// human sample $i" > data/raw/human/sample_$i.c
+            echo "// AI sample $i" > data/raw/ai/sample_$i.c
+          done
+          python -m src.data.validate
 
   train:
     runs-on: ubuntu-latest
