@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import mlflow
 from dotenv import load_dotenv
@@ -45,8 +46,8 @@ def log_run(
 
 def register_model(
     model_path: str,
-    model_name: Optional[str] = None,
-    run_id: Optional[str] = None,
+    model_name: str | None = None,
+    run_id: str | None = None,
 ) -> str:
     model_name = model_name or os.getenv("MODEL_NAME", "graphcodebert-human-ai-classifier")
 
@@ -75,7 +76,7 @@ def register_model(
 
 
 def promote_to_production(
-    model_name: Optional[str] = None, version: Optional[str] = None
+    model_name: str | None = None, version: str | None = None
 ) -> None:
     model_name = model_name or os.getenv("MODEL_NAME", "graphcodebert-human-ai-classifier")
 
