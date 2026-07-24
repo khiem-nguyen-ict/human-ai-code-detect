@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from dotenv import load_dotenv
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedShuffleSplit
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
@@ -174,6 +174,85 @@ def save_reference_embeddings(
     logger.info("Reference embeddings saved to %s, shape=%s", out, embeddings.shape)
 
 
+def _stratified_split(
+    input_ids: np.ndarray,
+    attention_mask: np.ndarray,
+    labels: np.ndarray,
+    test_size: float,
+    val_size: float,
+    seed: int,
+    max_retries: int = 20,
+) -> tuple[np.ndarray, ...]:
+    for attempt in range(max_retries):
+        attempt_seed = seed + attempt
+
+        sss = StratifiedShuffleSplit(
+            n_splits=1, test_size=test_size + val_size, random_state=attempt_seed
+        )
+        train_idx, temp_idx = next(sss.split(input_ids, labels))
+
+        train_labels = labels[train_idx]
+        temp_labels = labels[temp_idx]
+
+        val_size_in_temp = val_size / (test_size + val_size)
+        sss2 = StratifiedShuffleSplit(
+            n_splits=1, test_size=val_size_in_temp, random_state=attempt_seed
+        )
+        val_idx, test_idx = next(sss2.split(input_ids[temp_idx], temp_labels))
+
+        val_labels = temp_labels[val_idx]
+        test_labels = temp_labels[test_idx]
+
+        unique_train = set(np.unique(train_labels))
+        unique_val = set(np.unique(val_labels))
+        unique_test = set(np.unique(test_labels))
+
+        if unique_train == unique_val == unique_test:
+            train_input_ids, train_attention_mask, train_labels = (
+                input_ids[train_idx],
+                attention_mask[train_idx],
+                labels[train_idx],
+            )
+            temp_input_ids, temp_attention_mask, temp_labels = (
+                input_ids[temp_idx],
+                attention_mask[temp_idx],
+                labels[temp_idx],
+            )
+            val_input_ids, val_attention_mask, val_labels = (
+                temp_input_ids[val_idx],
+                temp_attention_mask[val_idx],
+                temp_labels[val_idx],
+            )
+            test_input_ids, test_attention_mask, test_labels = (
+                temp_input_ids[test_idx],
+                temp_attention_mask[test_idx],
+                temp_labels[test_idx],
+            )
+            logger.info(
+                "Stratified split succeeded on attempt %d - train: %d, val: %d, test: %d",
+                attempt + 1,
+                len(train_labels),
+                len(val_labels),
+                len(test_labels),
+            )
+            return (
+                train_input_ids,
+                train_attention_mask,
+                train_labels,
+                val_input_ids,
+                val_attention_mask,
+                val_labels,
+                test_input_ids,
+                test_attention_mask,
+                test_labels,
+            )
+
+    raise RuntimeError(
+        f"Failed to create a valid stratified split with both classes present in each subset "
+        f"after {max_retries} attempts. Consider increasing dataset size or adjusting test_size/val_size."
+    )
+
+
 def train() -> None:
     config = load_config()
     device = torch.device(os.getenv("DEVICE", "cpu"))
@@ -218,33 +297,22 @@ def train() -> None:
     seed = config["project"]["seed"]
 
     (
-        train_val_input_ids,
+        train_input_ids,
+        train_attention_mask,
+        train_labels,
+        val_input_ids,
+        val_attention_mask,
+        val_labels,
         test_input_ids,
-        train_val_attention_mask,
         test_attention_mask,
-        train_val_labels,
         test_labels,
-    ) = train_test_split(
+    ) = _stratified_split(
         input_ids,
         attention_mask,
         labels,
         test_size=test_split,
-        random_state=seed,
-        stratify=labels,
-    )
-
-    remaining = max(1.0 - test_split, 1e-9)
-    val_frac = val_split / remaining
-
-    train_input_ids, val_input_ids, train_attention_mask, val_attention_mask, train_labels, val_labels = (
-        train_test_split(
-            train_val_input_ids,
-            train_val_attention_mask,
-            train_val_labels,
-            test_size=val_frac,
-            random_state=seed,
-            stratify=train_val_labels,
-        )
+        val_size=val_split,
+        seed=seed,
     )
 
     train_dataset = CodeDataset(train_input_ids, train_attention_mask, train_labels)
