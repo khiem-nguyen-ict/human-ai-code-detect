@@ -5,7 +5,6 @@ __pycache__/
 .venv/
 venv/
 
-data/raw/
 data/processed/
 models/checkpoints/
 models/onnx/
