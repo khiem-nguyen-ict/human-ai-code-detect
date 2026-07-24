@@ -107,7 +107,18 @@ jobs:
       - name: Run container smoke test
         run: |
           docker run -d --name human-ai-detect -p 8080:8080 human-ai-detect:latest
-          sleep 10
-          curl -f http://localhost:8080/health || exit 1
-          docker stop human-ai-detect
-          docker rm human-ai-detect
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health; then
+              echo "Health check passed"
+              docker stop human-ai-detect
+              docker rm human-ai-detect
+              exit 0
+            fi
+            echo "Health check attempt $i failed, retrying..."
+            sleep 2
+          done
+          echo "Health check failed after retries"
+          docker logs human-ai-detect
+          docker stop human-ai-detect || true
+          docker rm human-ai-detect || true
+          exit 1

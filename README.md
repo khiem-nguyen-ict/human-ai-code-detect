@@ -5,7 +5,7 @@ Detect whether C source code is human-written or AI-generated using GraphCodeBER
 ## What it does
 
 - Loads a labeled dataset of human-written and AI-generated C code.
-- Fine-tunes `microsoft/graphcodebert-base` by freezing the encoder and training a 768 → 2 linear classifier.
+- Fine-tunes `microsoft/graphcodebert-base` by freezing the encoder and training a Dropout + Linear(768 → 2) classification head.
 - Serializes the fine-tuned model to PyTorch (`graphcodebert_human_ai.pt`).
 - Exports to ONNX FP16 (`graphcodebert_human_ai_fp16.onnx`) for CPU-friendly inference.
 - Runs predictions on raw C files or code strings, returning Human / AI probabilities.
@@ -50,13 +50,13 @@ make data          # Ingest and validate dataset
 make features      # Tokenize C files
 make train         # Train model and export ONNX
 make evaluate      # Compute metrics
-make registry      # Register in MLflow
+make registry      # Initialize MLflow tracking
 
 # 4. Run tests
 make test
 
 # 5. Start the inference API
-make deploy
+make deploy        # Build and run the inference container
 ```
 
 ### Option 2: Docker Compose
@@ -171,7 +171,7 @@ GraphCodeBERT encoder (frozen)
     ↓
 CLS embedding (768-d)
     ↓
-Linear(768 → 2) + Dropout
+Dropout → Linear(768 → 2)
     ↓
 Logits
     ↓
@@ -187,7 +187,7 @@ Human / AI probabilities
 - `docker/Dockerfile` — production inference container
 - `.github/workflows/ci-cd.yml` — GitHub Actions CI/CD pipeline
 - `config/config.yaml` — pipeline hyperparameters and settings
-- `config/schema.json` — dataset validation schema
+- `config/schema.json` — dataset JSON schema (validated in tests)
 - `requirements.txt` — Python dependencies
 - `pyproject.toml` — project configuration
 - `.env.example` — environment variable template
@@ -216,7 +216,7 @@ human-ai-code-detect/
 │   └── ci-cd.yml          # GitHub Actions CI/CD pipeline
 ├── config/
 │   ├── config.yaml        # Pipeline hyperparameters and settings
-│   └── schema.json        # Dataset validation schema
+│   └── schema.json        # Dataset JSON schema (validated in tests)
 ├── data/
 │   ├── raw/               # Raw ingested data (gitignored)
 │   ├── processed/         # Validated, tokenized data and artifacts (gitignored)
@@ -259,11 +259,11 @@ human-ai-code-detect/
 | Stage | Module | Description |
 |-------|--------|-------------|
 | Data Ingestion | `src/data/ingest.py` | Reads raw C files from `data/raw/dataset/` |
-| Data Validation | `src/data/validate.py` | Validates schema, class balance, file sizes |
+| Data Validation | `src/data/validate.py` | Validates class balance, file sizes, and directory structure |
 | Feature Engineering | `src/features/build_features.py` | Tokenizes C files with GraphCodeBERT tokenizer |
 | Model Training | `src/models/train.py` | Fine-tunes GraphCodeBERT with frozen encoder |
 | Model Evaluation | `src/models/evaluate.py` | Computes accuracy, F1, precision, recall, AUC-ROC |
-| Model Registry | `src/models/registry.py` | Registers model in MLflow with staging promotion |
+| Model Registry | `src/models/registry.py` | Initializes MLflow tracking and provides model registration utilities |
 | Deployment | `src/inference/api.py` | FastAPI server with `/predict` and `/health` endpoints |
 | Monitoring | `src/monitoring/drift.py` | Detects data drift using embedding statistics |
 | Retraining | `src/retrain/pipeline.py` | Orchestrates full pipeline re-run |
@@ -287,10 +287,10 @@ make train
 make evaluate
 
 # Register model in MLflow
-make registry
+make registry      # Initialize MLflow tracking
 
 # Start the inference API
-make deploy
+make deploy        # Build and run the inference container
 
 # Run the retraining pipeline
 make retrain
@@ -315,6 +315,6 @@ make clean
 | Inference | ONNX Runtime | Open-source (MIT) |
 | Containerization | Docker | Open-source (Apache 2.0) |
 | CI/CD | GitHub Actions | Free tier |
-| Data validation | Custom (JSON Schema) | — |
+| Data validation | Custom (Python/YAML) | — |
 | Monitoring | Custom (drift detection) | — |
 | Orchestration | Makefile + Python scripts | — |
