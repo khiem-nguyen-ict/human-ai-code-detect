@@ -1,0 +1,65 @@
+services:
+  train:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: human-ai-detect:train
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./tokenizer:/app/tokenizer
+      - ./dataset.zip:/app/dataset.zip
+    env_file: .env
+    command: >
+      sh -c "
+      python -m src.data.ingest &&
+      python -m src.data.validate &&
+      python -m src.features.build_features &&
+      python -m src.models.train &&
+      python -m src.models.evaluate &&
+      python -m src.models.registry
+      "
+    restart: "no"
+
+  serve:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: human-ai-detect:serve
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/app/models
+      - ./tokenizer:/app/tokenizer
+    env_file: .env
+    command: python -m src.inference.api
+    restart: unless-stopped
+    depends_on:
+      - train
+
+  monitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: human-ai-detect:monitor
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./tokenizer:/app/tokenizer
+    env_file: .env
+    command: python -m src.monitoring.drift
+    restart: "no"
+
+  retrain:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: human-ai-detect:retrain
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./tokenizer:/app/tokenizer
+      - ./dataset.zip:/app/dataset.zip
+    env_file: .env
+    command: python -m src.retrain.pipeline
+    restart: "no"

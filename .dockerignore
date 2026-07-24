@@ -1,0 +1,41 @@
+# .dockerignore
+# Reduce build context size and exclude unnecessary files
+
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Data and model artifacts (generated at runtime)
+data/raw/
+data/processed/
+models/checkpoints/
+models/onnx/
+models/registry/
+tokenizer/
+
+# Notebooks (not needed in container)
+*.ipynb
+
+# Environment files
+.env
+
+# Docker itself
+Dockerfile
+docker-compose.yml
+docker/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# CI/CD
+.github/
+
+# Tests (not needed in runtime image)
+tests/

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DatasetSchema",
+  "description": "Schema for validating the Human vs AI C code dataset",
+  "type": "object",
+  "required": ["dataset_dir", "human_dir", "ai_dir"],
+  "properties": {
+    "dataset_dir": {
+      "type": "string",
+      "description": "Root directory containing the dataset"
+    },
+    "human_dir": {
+      "type": "string",
+      "description": "Subdirectory name for human-written C files"
+    },
+    "ai_dir": {
+      "type": "string",
+      "description": "Subdirectory name for AI-generated C files"
+    },
+    "file_extension": {
+      "type": "string",
+      "default": ".c",
+      "description": "Expected file extension for source files"
+    },
+    "min_files_per_class": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "Minimum number of files required per class"
+    },
+    "max_file_size_mb": {
+      "type": "number",
+      "minimum": 0.01,
+      "default": 10.0,
+      "description": "Maximum allowed file size in megabytes"
+    },
+    "encoding": {
+      "type": "string",
+      "default": "utf-8",
+      "description": "Expected text encoding of source files"
+    }
+  }
+}

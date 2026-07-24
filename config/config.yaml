@@ -1,0 +1,68 @@
+project:
+  name: graphcodebert-human-ai-classifier
+  version: "0.1.0"
+  seed: 42
+
+data:
+  raw_dir: "./data/raw"
+  processed_dir: "./data/processed"
+  external_dir: "./data/external"
+  human_dir: "human"
+  ai_dir: "ai"
+  file_extension: ".c"
+
+model:
+  base_model: "microsoft/graphcodebert-base"
+  checkpoint_dir: "./models/checkpoints"
+  onnx_dir: "./models/onnx"
+  onnx_fp16_path: "./models/onnx/graphcodebert_human_ai_fp16.onnx"
+  pytorch_path: "./models/checkpoints/graphcodebert_human_ai.pt"
+  tokenizer_dir: "./tokenizer"
+  max_seq_length: 512
+  num_labels: 2
+  hidden_size: 768
+
+training:
+  batch_size: 2
+  learning_rate: 0.0001
+  num_epochs: 10
+  weight_decay: 0.01
+  warmup_steps: 500
+  lr_scheduler: "linear"
+  freeze_encoder: true
+  optimizer: "adamw"
+  gradient_accumulation_steps: 1
+  fp16: true
+  save_top_k: 3
+  metric_for_best_model: "val_f1"
+  greater_is_better: true
+
+evaluation:
+  test_split: 0.2
+  val_split: 0.1
+  metrics:
+    - accuracy
+    - f1
+    - precision
+    - recall
+    - auc_roc
+  thresholds:
+    accuracy: 0.90
+    f1: 0.85
+
+mlflow:
+  tracking_uri: "file:./models/registry/mlruns"
+  experiment_name: "human-ai-code-detection"
+  registry_name: "human-ai-classifier"
+
+deployment:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 1
+  timeout: 30
+
+monitoring:
+  drift_threshold: 0.05
+  log_predictions: true
+  prediction_log_path: "./data/processed/predictions_log.csv"
+  reference_data_path: "./data/processed/reference_embeddings.npy"
