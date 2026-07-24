@@ -217,7 +217,14 @@ def train() -> None:
     val_split = config["evaluation"]["val_split"]
     seed = config["project"]["seed"]
 
-    train_val_input_ids, test_input_ids, train_val_attention_mask, test_attention_mask, train_val_labels, test_labels = train_test_split(
+    (
+        train_val_input_ids,
+        test_input_ids,
+        train_val_attention_mask,
+        test_attention_mask,
+        train_val_labels,
+        test_labels,
+    ) = train_test_split(
         input_ids,
         attention_mask,
         labels,
@@ -229,13 +236,15 @@ def train() -> None:
     remaining = max(1.0 - test_split, 1e-9)
     val_frac = val_split / remaining
 
-    train_input_ids, val_input_ids, train_attention_mask, val_attention_mask, train_labels, val_labels = train_test_split(
-        train_val_input_ids,
-        train_val_attention_mask,
-        train_val_labels,
-        test_size=val_frac,
-        random_state=seed,
-        stratify=train_val_labels,
+    train_input_ids, val_input_ids, train_attention_mask, val_attention_mask, train_labels, val_labels = (
+        train_test_split(
+            train_val_input_ids,
+            train_val_attention_mask,
+            train_val_labels,
+            test_size=val_frac,
+            random_state=seed,
+            stratify=train_val_labels,
+        )
     )
 
     train_dataset = CodeDataset(train_input_ids, train_attention_mask, train_labels)
@@ -309,7 +318,8 @@ def train() -> None:
         val_loss = val_metrics.get("loss", 0.0)
 
         logger.info(
-            "Epoch %d/%d - Train Loss: %.4f - Val Loss: %.4f - Val Acc: %.4f - Val F1: %.4f - Val Prec: %.4f - Val Rec: %.4f",
+            "Epoch %d/%d - Train Loss: %.4f - Val Loss: %.4f - Val Acc: %.4f"
+            " - Val F1: %.4f - Val Prec: %.4f - Val Rec: %.4f",
             epoch + 1,
             config["training"]["num_epochs"],
             train_loss,

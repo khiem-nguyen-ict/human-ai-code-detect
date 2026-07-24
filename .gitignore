@@ -18,6 +18,7 @@ notebooks/.ipynb_checkpoints/
 
 .mlflow/
 mlruns/
+models/registry/mlflow.db
 
 .DS_Store
 *.egg-info/

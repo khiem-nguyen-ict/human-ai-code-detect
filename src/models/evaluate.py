@@ -98,7 +98,10 @@ def evaluate_model(
     )
 
     logger.info("Evaluation metrics: %s", metrics)
-    logger.info("Classification report:\n%s", classification_report(all_labels, all_preds, target_names=["human", "ai"]))
+    report_text = classification_report(
+        all_labels, all_preds, target_names=["human", "ai"]
+    )
+    logger.info("Classification report:\n%s", report_text)
 
     return {
         "metrics": metrics,
