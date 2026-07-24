@@ -13,6 +13,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from transformers import AutoModel
 
@@ -48,6 +49,9 @@ def evaluate_model(
     all_preds = []
     all_labels = []
     all_probs = []
+    total_loss = 0.0
+    num_batches = 0
+    criterion = CrossEntropyLoss()
 
     with torch.no_grad():
         for batch in dataloader:
@@ -56,6 +60,10 @@ def evaluate_model(
             labels = batch["labels"].to(device)
 
             logits = model(input_ids=input_ids, attention_mask=attention_mask)
+            loss = criterion(logits, labels)
+            total_loss += loss.item()
+            num_batches += 1
+
             probs = torch.softmax(logits, dim=-1)
 
             preds = torch.argmax(logits, dim=-1)
@@ -68,7 +76,10 @@ def evaluate_model(
     all_labels = np.array(all_labels)
     all_probs = np.array(all_probs)
 
+    avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+
     metrics = {
+        "loss": avg_loss,
         "accuracy": accuracy_score(all_labels, all_preds),
         "f1": f1_score(all_labels, all_preds, average="weighted"),
         "precision": precision_score(all_labels, all_preds, average="weighted"),
@@ -87,7 +98,10 @@ def evaluate_model(
     )
 
     logger.info("Evaluation metrics: %s", metrics)
-    logger.info("Classification report:\n%s", classification_report(all_labels, all_preds, target_names=["human", "ai"]))
+    report_text = classification_report(
+        all_labels, all_preds, target_names=["human", "ai"]
+    )
+    logger.info("Classification report:\n%s", report_text)
 
     return {
         "metrics": metrics,

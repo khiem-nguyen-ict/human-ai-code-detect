@@ -12,7 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY config/ ./config/
 COPY .env.example .env
-COPY dataset.zip ./dataset.zip
 
 RUN mkdir -p models/checkpoints models/onnx data/raw data/processed tokenizer
 
@@ -20,7 +19,7 @@ ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DEVICE=cpu
-ENV MLFLOW_TRACKING_URI=file:./models/registry/mlruns
+ENV MLFLOW_TRACKING_URI=sqlite:///models/registry/mlflow.db
 
 EXPOSE 8080
 

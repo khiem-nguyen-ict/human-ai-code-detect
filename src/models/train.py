@@ -5,10 +5,13 @@ from pathlib import Path
 import numpy as np
 import torch
 from dotenv import load_dotenv
+from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
+
+from src.models.evaluate import evaluate_model
 
 load_dotenv()
 
@@ -200,21 +203,75 @@ def train() -> None:
     human_data = np.load(str(human_path), allow_pickle=True)
     ai_data = np.load(str(ai_path), allow_pickle=True)
 
-    train_input_ids = np.concatenate(
+    input_ids = np.concatenate(
         [human_data["input_ids"], ai_data["input_ids"]], axis=0
     )
-    train_attention_mask = np.concatenate(
+    attention_mask = np.concatenate(
         [human_data["attention_mask"], ai_data["attention_mask"]], axis=0
     )
-    train_labels = np.concatenate(
+    labels = np.concatenate(
         [human_data["labels"], ai_data["labels"]], axis=0
     )
 
+    test_split = config["evaluation"]["test_split"]
+    val_split = config["evaluation"]["val_split"]
+    seed = config["project"]["seed"]
+
+    (
+        train_val_input_ids,
+        test_input_ids,
+        train_val_attention_mask,
+        test_attention_mask,
+        train_val_labels,
+        test_labels,
+    ) = train_test_split(
+        input_ids,
+        attention_mask,
+        labels,
+        test_size=test_split,
+        random_state=seed,
+        stratify=labels,
+    )
+
+    remaining = max(1.0 - test_split, 1e-9)
+    val_frac = val_split / remaining
+
+    train_input_ids, val_input_ids, train_attention_mask, val_attention_mask, train_labels, val_labels = (
+        train_test_split(
+            train_val_input_ids,
+            train_val_attention_mask,
+            train_val_labels,
+            test_size=val_frac,
+            random_state=seed,
+            stratify=train_val_labels,
+        )
+    )
+
     train_dataset = CodeDataset(train_input_ids, train_attention_mask, train_labels)
+    val_dataset = CodeDataset(val_input_ids, val_attention_mask, val_labels)
+    test_dataset = CodeDataset(test_input_ids, test_attention_mask, test_labels)
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["training"]["batch_size"],
         shuffle=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+    )
+
+    logger.info(
+        "Dataset split - train: %d, val: %d, test: %d",
+        len(train_dataset),
+        len(val_dataset),
+        len(test_dataset),
     )
 
     base_model = AutoModel.from_pretrained(config["model"]["base_model"])
@@ -224,6 +281,9 @@ def train() -> None:
 
     model = ClassificationHead(base_model, num_labels=config["model"]["num_labels"])
     model.to(device)
+
+    best_val_f1 = 0.0
+    best_state = None
 
     optimizer = AdamW(
         model.parameters(),
@@ -249,20 +309,64 @@ def train() -> None:
             config["training"]["gradient_accumulation_steps"],
         )
 
+        val_results = evaluate_model(model, val_loader, device)
+        val_metrics = val_results["metrics"]
+        val_f1 = val_metrics.get("f1", 0.0)
+        val_acc = val_metrics.get("accuracy", 0.0)
+        val_prec = val_metrics.get("precision", 0.0)
+        val_rec = val_metrics.get("recall", 0.0)
+        val_loss = val_metrics.get("loss", 0.0)
+
         logger.info(
-            "Epoch %d/%d - Train Loss: %.4f",
+            "Epoch %d/%d - Train Loss: %.4f - Val Loss: %.4f - Val Acc: %.4f"
+            " - Val F1: %.4f - Val Prec: %.4f - Val Rec: %.4f",
             epoch + 1,
             config["training"]["num_epochs"],
             train_loss,
+            val_loss,
+            val_acc,
+            val_f1,
+            val_prec,
+            val_rec,
         )
+
+        if val_f1 > best_val_f1:
+            best_val_f1 = val_f1
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            best_path = Path(checkpoint_dir) / "graphcodebert_best.pt"
+            torch.save(best_state, best_path)
+            logger.info("Best checkpoint saved to %s (val_f1=%.4f)", best_path, best_val_f1)
 
         checkpoint_path = Path(checkpoint_dir) / f"graphcodebert_epoch_{epoch+1}.pt"
         torch.save(model.state_dict(), checkpoint_path)
         logger.info("Checkpoint saved to %s", checkpoint_path)
 
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        model.to(device)
+
     final_path = Path(checkpoint_dir) / "graphcodebert_human_ai.pt"
     torch.save(model.state_dict(), final_path)
     logger.info("Final model saved to %s", final_path)
+
+    test_results = evaluate_model(model, test_loader, device)
+    test_metrics = test_results["metrics"]
+    logger.info(
+        "Test metrics - Acc: %.4f - F1: %.4f - Prec: %.4f - Rec: %.4f - AUC: %.4f",
+        test_metrics.get("accuracy", 0.0),
+        test_metrics.get("f1", 0.0),
+        test_metrics.get("precision", 0.0),
+        test_metrics.get("recall", 0.0),
+        test_metrics.get("auc_roc", 0.0),
+    )
+
+    out = Path("./data/processed/test_metrics.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    import json
+
+    with open(out, "w") as f:
+        json.dump(test_metrics, f, indent=2)
+    logger.info("Test metrics saved to %s", out)
 
     save_reference_embeddings(base_model, tokenizer, config)
 

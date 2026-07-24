@@ -24,12 +24,12 @@ pip install -r requirements.txt
 
 ## Dataset
 
-`dataset.zip` should contain:
+Raw data is already available in `data/raw/dataset/`:
 
 ```
-dataset.zip
-└── human/   # C files labeled as human-written (label 0)
-    └── *.c
+data/raw/dataset/
+├── human/   # C files labeled as human-written (label 0)
+│   └── *.c
 └── ai/      # C files labeled as AI-generated  (label 1)
     └── *.c
 ```
@@ -192,7 +192,6 @@ Human / AI probabilities
 - `pyproject.toml` — project configuration
 - `.env.example` — environment variable template
 - `notebooks/GraphCodeBERT_Course_Detect_Human_and_AI_code.ipynb` — main training and inference notebook
-- `dataset.zip` — course dataset with human and AI C files
 
 ## Notes
 
@@ -259,7 +258,7 @@ human-ai-code-detect/
 
 | Stage | Module | Description |
 |-------|--------|-------------|
-| Data Ingestion | `src/data/ingest.py` | Extracts `dataset.zip` into `data/raw/` |
+| Data Ingestion | `src/data/ingest.py` | Reads raw C files from `data/raw/dataset/` |
 | Data Validation | `src/data/validate.py` | Validates schema, class balance, file sizes |
 | Feature Engineering | `src/features/build_features.py` | Tokenizes C files with GraphCodeBERT tokenizer |
 | Model Training | `src/models/train.py` | Fine-tunes GraphCodeBERT with frozen encoder |

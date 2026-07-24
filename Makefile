@@ -33,9 +33,9 @@ lint: ## Run linting
 	ruff check src/ tests/
 
 clean: ## Remove generated artifacts
-	rm -rf models/checkpoints/* models/onnx/*
+	rm -rf models/checkpoints/* models/onnx/* models/registry/mlflow.db
 	rm -rf data/processed/*
-	rm -rf .mlflow/ mlruns/
+	rm -rf .mlflow/
 
 retrain: ## Run the full retraining pipeline
 	python -m src.retrain.pipeline

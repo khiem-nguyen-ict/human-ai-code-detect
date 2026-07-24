@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup_mlflow() -> mlflow.MlflowClient:
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "file:./models/registry/mlruns")
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///models/registry/mlflow.db")
     mlflow.set_tracking_uri(tracking_uri)
 
     experiment_name = os.getenv("MLFLOW_EXPERIMENT", "human-ai-code-detection")

@@ -51,7 +51,7 @@ evaluation:
     f1: 0.85
 
 mlflow:
-  tracking_uri: "file:./models/registry/mlruns"
+  tracking_uri: "sqlite:///models/registry/mlflow.db"
   experiment_name: "human-ai-code-detection"
   registry_name: "human-ai-classifier"
 
