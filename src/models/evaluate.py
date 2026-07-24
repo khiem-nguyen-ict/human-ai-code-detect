@@ -129,12 +129,14 @@ def main() -> None:
 
     from src.features.build_features import load_tokenized_data
 
-    test_data = load_tokenized_data("human")
-    test_dataset = CodeDataset(
-        test_data["input_ids"],
-        test_data["attention_mask"],
-        test_data["labels"],
-    )
+    human_data = load_tokenized_data("human")
+    ai_data = load_tokenized_data("ai")
+
+    input_ids = np.concatenate([human_data["input_ids"], ai_data["input_ids"]], axis=0)
+    attention_mask = np.concatenate([human_data["attention_mask"], ai_data["attention_mask"]], axis=0)
+    labels = np.concatenate([human_data["labels"], ai_data["labels"]], axis=0)
+
+    test_dataset = CodeDataset(input_ids, attention_mask, labels)
     test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
     results = evaluate_model(model, test_loader, device)
@@ -142,6 +144,7 @@ def main() -> None:
     out = Path("./data/processed/evaluation_results.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     import json
+
     with open(out, "w") as f:
         json.dump(results["metrics"], f, indent=2)
 
