@@ -12,7 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY config/ ./config/
 COPY .env.example .env
-COPY dataset.zip ./dataset.zip
 
 RUN mkdir -p models/checkpoints models/onnx data/raw data/processed tokenizer
 

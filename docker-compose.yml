@@ -8,7 +8,6 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
-      - ./dataset.zip:/app/dataset.zip
     env_file: .env
     command: >
       sh -c "
@@ -59,7 +58,6 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./tokenizer:/app/tokenizer
-      - ./dataset.zip:/app/dataset.zip
     env_file: .env
     command: python -m src.retrain.pipeline
     restart: "no"
