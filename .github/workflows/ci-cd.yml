@@ -101,12 +101,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download model artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
+          path: models/
+
       - name: Build Docker image
         run: docker build -t human-ai-detect:latest -f docker/Dockerfile .
 
       - name: Run container smoke test
         run: |
-          docker run -d --name human-ai-detect -p 8080:8080 human-ai-detect:latest
+          docker run -d --name human-ai-detect -p 8080:8080 -v ${{ github.workspace }}/models:/app/models -v ${{ github.workspace }}/tokenizer:/app/tokenizer human-ai-detect:latest
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8080/health; then
               echo "Health check passed"
