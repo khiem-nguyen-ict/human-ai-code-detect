@@ -453,7 +453,7 @@ def export_to_onnx(model: nn.Module, tokenizer: AutoTokenizer, config: dict) -> 
     model.eval()
     model.base_model.eval()
 
-    fp32_path = onnx_path.with_suffix(".onnx")
+    fp32_path = onnx_path.with_suffix(".fp32.onnx")
 
     torch.onnx.export(
         model,
