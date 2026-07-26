@@ -28,7 +28,11 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "retrain=true" >> $GITHUB_OUTPUT
           else
-            CHANGED=$(git diff --name-only origin/main HEAD | grep -E "^data/raw/(human|ai)/" || true)
+            if [ "${{ github.event_name }}" = "push" ]; then
+              CHANGED=$(git diff --name-only ${{ github.event.before }} HEAD | grep -E "^data/raw/(human|ai)/" || true)
+            else
+              CHANGED=$(git diff --name-only origin/main HEAD | grep -E "^data/raw/(human|ai)/" || true)
+            fi
             if [ -n "$CHANGED" ]; then
               echo "retrain=true" >> $GITHUB_OUTPUT
             else
