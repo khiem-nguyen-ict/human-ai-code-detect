@@ -1,13 +1,11 @@
 import json
 import logging
 import os
-import sys
-
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.models.registry import should_deploy, _compute_deployment_score, get_production_metrics
+from src.models.registry import _compute_deployment_score, get_production_metrics, should_deploy
 
 load_dotenv()
 

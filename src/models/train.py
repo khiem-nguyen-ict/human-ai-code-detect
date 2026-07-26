@@ -458,7 +458,7 @@ def train() -> None:
         run_id = log_run(test_metrics, params, final_path, run_name="training_run")
         version = register_model(final_path, run_id=run_id)
         logger.info("Model registered as version %s", version)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("MLflow logging/registration failed: %s", e)
 
     save_reference_embeddings(base_model, tokenizer, config)
