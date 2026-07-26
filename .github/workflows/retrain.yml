@@ -119,10 +119,28 @@ jobs:
             echo "Health check attempt $i failed, retrying..."
             sleep 2
           done
-          curl -sf -X POST http://localhost:8080/predict \
+          RESPONSE=$(curl -sf -X POST http://localhost:8080/predict \
             -H "Content-Type: application/json" \
-            -d '{"code": "#include <stdio.h>\\nint main() { return 0; }"}' \
-            | python -c "import sys,json; d=json.load(sys.stdin); assert 'prediction' in d and 'human_probability' in d and 'ai_probability' in d"
+            -d '{"code": "#include <stdio.h>\\nint main() { return 0; }"}')
+          echo "Human code prediction result: $RESPONSE"
+          echo "$RESPONSE" | python -c "
+            import sys, json
+            d = json.load(sys.stdin)
+            assert d['prediction'] == 'human', f\"Expected 'human' but got '{d['prediction']}'\"
+            assert d['human_probability'] > d['ai_probability'], 'Human probability should be higher for human code'
+            print('Smoke test passed: human code correctly classified as human')
+            "
+          RESPONSE=$(curl -sf -X POST http://localhost:8080/predict \
+            -H "Content-Type: application/json" \
+            -d '{"code": "def fibonacci(n):\\n    if n <= 1:\\n        return n\\n    return fibonacci(n-1) + fibonacci(n-2)\\n\\nprint(fibonacci(10))"}')
+          echo "AI code prediction result: $RESPONSE"
+          echo "$RESPONSE" | python -c "
+            import sys, json
+            d = json.load(sys.stdin)
+            assert d['prediction'] == 'ai', f\"Expected 'ai' but got '{d['prediction']}'\"
+            assert d['ai_probability'] > d['human_probability'], 'AI probability should be higher for AI code'
+            print('Smoke test passed: AI code correctly classified as AI')
+            "
           docker stop human-ai-detect
           docker rm human-ai-detect
 
