@@ -32,7 +32,7 @@ class Predictor:
         if not Path(self.onnx_path).exists():
             raise FileNotFoundError(f"ONNX model not found at {self.onnx_path}")
 
-        self.session = ort.InferenceSession(self.onnx_path)
+        self.session = ort.InferenceSession(self.onnx_path, providers=["CPUExecutionProvider"])
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_path)
 
         logger.info("Predictor initialized with model at %s", self.onnx_path)

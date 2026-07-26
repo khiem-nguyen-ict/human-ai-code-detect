@@ -452,13 +452,13 @@ def export_to_onnx(model: nn.Module, tokenizer: AutoTokenizer, config: dict) -> 
 
     model.eval()
     model.base_model.eval()
-
-    fp32_path = onnx_path.with_suffix(".fp32.onnx")
+    model.half()
+    model.base_model.half()
 
     torch.onnx.export(
         model,
         (dummy_input_ids, dummy_attention_mask),
-        str(fp32_path),
+        str(onnx_path),
         input_names=["input_ids", "attention_mask"],
         output_names=["logits"],
         dynamic_axes={
@@ -469,34 +469,7 @@ def export_to_onnx(model: nn.Module, tokenizer: AutoTokenizer, config: dict) -> 
         opset_version=14,
     )
 
-    logger.info("ONNX FP32 model exported to %s", fp32_path)
-
-    import onnx
-
-    model_fp32 = onnx.load(str(fp32_path))
-    onnx.save(model_fp32, str(fp32_path))
-
-    from onnx import TensorProto
-
-    for initializer in model_fp32.graph.initializer:
-        if initializer.data_type == TensorProto.FLOAT:
-            initializer.raw_data = (
-                np.frombuffer(initializer.raw_data, dtype=np.float32)
-                .astype(np.float16)
-                .tobytes()
-            )
-            initializer.data_type = TensorProto.FLOAT16
-
-    for node in model_fp32.graph.node:
-        for attr in node.attribute:
-            if attr.HasField("f"):
-                attr.f = np.float16(attr.f).item()
-
-    onnx.save(model_fp32, str(onnx_path))
-    logger.info("ONNX FP16 model saved to %s", onnx_path)
-
-    if fp32_path.exists():
-        fp32_path.unlink()
+    logger.info("ONNX FP16 model exported to %s", onnx_path)
 
 
 def main() -> None:
