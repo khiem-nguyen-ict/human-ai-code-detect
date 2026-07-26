@@ -10,10 +10,13 @@ from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers.utils import logging as transformers_logging
 
 from src.models.evaluate import evaluate_model
 
 load_dotenv()
+
+transformers_logging.set_verbosity_error()
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
