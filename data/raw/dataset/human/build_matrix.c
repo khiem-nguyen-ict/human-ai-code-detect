@@ -1,7 +1,7 @@
 #define STB_DEFINE
 #include "stb.h"
 
-// true if no error
+// true if no error!
 int run_command(char *batch_file, char *command)
 {
    char buffer[4096];
@@ -34,6 +34,7 @@ typedef struct
 
 project_info *projects;
 
+// define the enum to use later
 enum { NONE, IN_COMPILERS, IN_ARGS, IN_PROJECTS, IN_LINK };
 
 int main(int argc, char **argv)
