@@ -1,0 +1,131 @@
+name: Retrain and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 1"
+
+concurrency:
+  group: retrain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  should-retrain:
+    runs-on: ubuntu-latest
+    outputs:
+      retrain: ${{ steps.check.outputs.retrain }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect data changes
+        id: check
+        run: |
+          git fetch origin main
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "retrain=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED=$(git diff --name-only origin/main HEAD | grep -E "^data/raw/(human|ai)/" || true)
+            if [ -n "$CHANGED" ]; then
+              echo "retrain=true" >> $GITHUB_OUTPUT
+            else
+              echo "retrain=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  train:
+    runs-on: ubuntu-latest
+    needs: should-retrain
+    if: needs.should-retrain.outputs.retrain == "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Feature engineering
+        run: python -m src.features.build_features
+
+      - name: Train model
+        run: python -m src.models.train
+
+      - name: Evaluate model
+        run: python -m src.models.evaluate
+
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            models/checkpoints/
+            models/onnx/
+            tokenizer/
+            models/registry/
+            mlruns/
+          retention-days: 30
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: train
+    if: github.ref == "refs/heads/main"
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Download model artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
+          path: .
+
+      - name: Check F1 deployment gate
+        id: f1-gate
+        run: python -m src.models.deploy
+
+      - name: Deploy model
+        if: steps.f1-gate.outputs.should_deploy == "true"
+        run: |
+          docker build -t human-ai-detect:latest -f docker/Dockerfile .
+          docker run -d --name human-ai-detect -p 8080:8080 \
+            -v ${{ github.workspace }}/models:/app/models \
+            -v ${{ github.workspace }}/tokenizer:/app/tokenizer \
+            human-ai-detect:latest
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health; then
+              echo "Health check passed"
+              break
+            fi
+            echo "Health check attempt $i failed, retrying..."
+            sleep 2
+          done
+          curl -sf -X POST http://localhost:8080/predict \
+            -H "Content-Type: application/json" \
+            -d '{"code": "#include <stdio.h>\\nint main() { return 0; }"}' \
+            | python -c "import sys,json; d=json.load(sys.stdin); assert 'prediction' in d and 'human_probability' in d and 'ai_probability' in d"
+          docker stop human-ai-detect
+          docker rm human-ai-detect
+
+      - name: Promote model to Production
+        if: steps.f1-gate.outputs.should_deploy == "true"
+        run: python -m src.models.registry --promote-staging
+
+      - name: Skip deployment notification
+        if: steps.f1-gate.outputs.should_deploy != "true"
+        run: |
+          echo "Deployment skipped: ${{ steps.f1-gate.outputs.deploy_reason }}"

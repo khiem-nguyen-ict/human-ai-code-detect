@@ -13,6 +13,7 @@ from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warm
 from transformers.utils import logging as transformers_logging
 
 from src.models.evaluate import evaluate_model
+from src.models.registry import log_run, register_model
 
 load_dotenv()
 
@@ -438,6 +439,27 @@ def train() -> None:
     with open(out, "w") as f:
         json.dump(test_metrics, f, indent=2)
     logger.info("Test metrics saved to %s", out)
+
+    params = {
+        "base_model": config["model"]["base_model"],
+        "batch_size": config["training"]["batch_size"],
+        "learning_rate": config["training"]["learning_rate"],
+        "num_epochs": config["training"]["num_epochs"],
+        "freeze_encoder": config["training"]["freeze_encoder"],
+        "max_seq_length": config["model"]["max_seq_length"],
+        "num_labels": config["model"]["num_labels"],
+        "optimizer": config["training"]["optimizer"],
+        "weight_decay": config["training"]["weight_decay"],
+        "warmup_steps": config["training"]["warmup_steps"],
+        "gradient_accumulation_steps": config["training"]["gradient_accumulation_steps"],
+    }
+
+    try:
+        run_id = log_run(test_metrics, params, final_path, run_name="training_run")
+        version = register_model(final_path, run_id=run_id)
+        logger.info("Model registered as version %s", version)
+    except Exception as e:
+        logger.warning("MLflow logging/registration failed: %s", e)
 
     save_reference_embeddings(base_model, tokenizer, config)
 

@@ -185,7 +185,8 @@ Human / AI probabilities
 - `Makefile` — common commands for pipeline stages
 - `docker-compose.yml` — containerized train, serve, monitor, retrain services
 - `docker/Dockerfile` — production inference container
-- `.github/workflows/ci-cd.yml` — GitHub Actions CI/CD pipeline
+- `.github/workflows/ci.yml` — GitHub Actions CI pipeline (lint, tests, data validation)
+- `.github/workflows/retrain.yml` — GitHub Actions retraining and deployment pipeline
 - `config/config.yaml` — pipeline hyperparameters and settings
 - `config/schema.json` — dataset JSON schema (validated in tests)
 - `requirements.txt` — Python dependencies
@@ -213,7 +214,8 @@ Model Evaluation → Model Registry → Deployment → Monitoring → Retraining
 ```
 human-ai-code-detect/
 ├── .github/workflows/
-│   └── ci-cd.yml          # GitHub Actions CI/CD pipeline
+│   ├── ci.yml          # GitHub Actions CI pipeline
+│   └── retrain.yml     # GitHub Actions retraining and deployment pipeline
 ├── config/
 │   ├── config.yaml        # Pipeline hyperparameters and settings
 │   └── schema.json        # Dataset JSON schema (validated in tests)
@@ -234,10 +236,11 @@ human-ai-code-detect/
 │   │   └── validate.py    # Schema and quality validation
 │   ├── features/          # Feature engineering
 │   │   └── build_features.py  # Tokenization and embedding
-│   ├── models/            # Training, evaluation, registry
+│   ├── models/            # Training, evaluation, registry, deployment
 │   │   ├── train.py       # Model training loop
 │   │   ├── evaluate.py    # Model evaluation metrics
-│   │   └── registry.py    # MLflow model registry
+│   │   ├── registry.py    # MLflow model registry and deployment gate
+│   │   └── deploy.py      # F1/composite-score deployment gate
 │   ├── inference/         # Serving and prediction
 │   │   ├── api.py         # FastAPI inference server
 │   │   └── predict.py     # ONNX Runtime prediction class
@@ -263,10 +266,31 @@ human-ai-code-detect/
 | Feature Engineering | `src/features/build_features.py` | Tokenizes C files with GraphCodeBERT tokenizer |
 | Model Training | `src/models/train.py` | Fine-tunes GraphCodeBERT with frozen encoder |
 | Model Evaluation | `src/models/evaluate.py` | Computes accuracy, F1, precision, recall, AUC-ROC |
-| Model Registry | `src/models/registry.py` | Initializes MLflow tracking and provides model registration utilities |
+| Model Registry | `src/models/registry.py` | MLflow tracking, model registration, and deployment scoring |
+| Deployment Gate | `src/models/deploy.py` | Compares new model composite score against Production before deploy |
 | Deployment | `src/inference/api.py` | FastAPI server with `/predict` and `/health` endpoints |
 | Monitoring | `src/monitoring/drift.py` | Detects data drift using embedding statistics |
 | Retraining | `src/retrain/pipeline.py` | Orchestrates full pipeline re-run |
+
+### Deployment Gate
+
+The deploy job uses a composite score to decide whether a newly trained model should replace the current Production model.
+
+**Composite score formula:**
+```
+score = (F1 × 0.5) + (Precision × 0.3) + (Recall × 0.2)
+```
+
+**Decision logic:**
+
+| Scenario | Condition | Action |
+|----------|-----------|--------|
+| First deployment (no Production model) | F1 ≥ 0.70, Precision ≥ 0.65, Recall ≥ 0.65 | Deploy |
+| First deployment | Any metric below minimum | Skip deployment |
+| Subsequent deployment | `new_score > production_score` | Deploy |
+| Subsequent deployment | `new_score <= production_score` | Skip deployment |
+
+This prevents deploying models that improve F1 but regress on precision or recall, which is especially important with limited training samples where single-metric noise is common.
 
 ### Running the Pipeline
 

@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 def setup_mlflow() -> mlflow.MlflowClient:
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///models/registry/mlflow.db")
+    if tracking_uri.startswith("sqlite:///"):
+        db_path = tracking_uri.replace("sqlite:///", "")
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
     mlflow.set_tracking_uri(tracking_uri)
 
     experiment_name = os.getenv("MLFLOW_EXPERIMENT", "human-ai-code-detection")
@@ -75,6 +79,65 @@ def register_model(
         raise
 
 
+def get_production_metrics(model_name: str | None = None) -> dict | None:
+    model_name = model_name or os.getenv("MODEL_NAME", "graphcodebert-human-ai-classifier")
+
+    client = setup_mlflow()
+
+    prod_versions = client.get_latest_versions(model_name, stages=["Production"])
+    if not prod_versions:
+        return None
+
+    run_id = prod_versions[0].run_id
+    run = client.get_run(run_id)
+    return dict(run.data.metrics) if run.data.metrics else None
+
+
+def _compute_deployment_score(metrics: dict) -> float:
+    f1_weight = 0.5
+    precision_weight = 0.3
+    recall_weight = 0.2
+
+    return (
+        metrics.get("f1", 0.0) * f1_weight
+        + metrics.get("precision", 0.0) * precision_weight
+        + metrics.get("recall", 0.0) * recall_weight
+    )
+
+
+def _check_minimum_thresholds(metrics: dict) -> tuple[bool, str]:
+    min_f1 = 0.70
+    min_precision = 0.65
+    min_recall = 0.65
+
+    f1 = metrics.get("f1", 0.0)
+    precision = metrics.get("precision", 0.0)
+    recall = metrics.get("recall", 0.0)
+
+    if f1 < min_f1:
+        return False, f"F1 {f1:.4f} below minimum threshold {min_f1}"
+    if precision < min_precision:
+        return False, f"Precision {precision:.4f} below minimum threshold {min_precision}"
+    if recall < min_recall:
+        return False, f"Recall {recall:.4f} below minimum threshold {min_recall}"
+
+    return True, "First model passed minimum thresholds."
+
+
+def should_deploy(new_metrics: dict, model_name: str | None = None) -> tuple[bool, str]:
+    prod_metrics = get_production_metrics(model_name)
+
+    if prod_metrics is None:
+        return _check_minimum_thresholds(new_metrics)
+
+    prev_score = _compute_deployment_score(prod_metrics)
+    new_score = _compute_deployment_score(new_metrics)
+
+    if new_score > prev_score:
+        return True, f"New score ({new_score:.4f}) > Production score ({prev_score:.4f}). Deploying."
+    return False, f"New score ({new_score:.4f}) <= Production score ({prev_score:.4f}). Skipping deployment."
+
+
 def promote_to_production(
     model_name: str | None = None, version: str | None = None
 ) -> None:
@@ -103,8 +166,17 @@ def promote_to_production(
 
 
 def main() -> None:
-    setup_mlflow()
-    logger.info("MLflow tracking initialized at %s", os.getenv("MLFLOW_TRACKING_URI"))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="MLflow model registry utilities")
+    parser.add_argument("--promote-staging", action="store_true", help="Promote latest Staging model to Production")
+    args = parser.parse_args()
+
+    if args.promote_staging:
+        promote_to_production()
+    else:
+        setup_mlflow()
+        logger.info("MLflow tracking initialized at %s", os.getenv("MLFLOW_TRACKING_URI"))
 
 
 if __name__ == "__main__":
