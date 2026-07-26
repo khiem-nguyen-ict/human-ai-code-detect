@@ -141,7 +141,7 @@ def main() -> None:
 
     results = evaluate_model(model, test_loader, device)
 
-    out = Path("./data/processed/evaluation_results.json")
+    out = Path("./data/processed/test_metrics.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     import json
 

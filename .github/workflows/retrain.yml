@@ -69,6 +69,7 @@ jobs:
         with:
           name: model-artifacts
           path: |
+            data/processed/test_metrics.json
             models/checkpoints/
             models/onnx/
             tokenizer/
