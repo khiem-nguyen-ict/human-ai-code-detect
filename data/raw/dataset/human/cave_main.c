@@ -36,7 +36,7 @@ char *game_name = "caveview";
 #define REVERSE_DEPTH
 
 
-
+// print string message
 static void print_string(float x, float y, char *text, float r, float g, float b)
 {
    static char buffer[99999];
